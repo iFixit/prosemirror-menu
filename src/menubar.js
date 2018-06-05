@@ -1,7 +1,7 @@
-const crel = require("crel")
-const {Plugin} = require("prosemirror-state")
+import crel from "crel"
+import {Plugin} from "prosemirror-state"
 
-const {renderGrouped} = require("./menu")
+import {renderGrouped} from "./menu"
 
 const prefix = "ProseMirror-menubar"
 
@@ -11,7 +11,7 @@ function isIOS() {
   return !/Edge\/\d/.test(agent) && /AppleWebKit/.test(agent) && /Mobile\/\w+/.test(agent)
 }
 
-// :: (Object)
+// :: (Object) → Plugin
 // A plugin that will place a menu bar above the editor. Note that
 // this involves wrapping the editor in an additional `<div>`.
 //
@@ -26,12 +26,11 @@ function isIOS() {
 //     Determines whether the menu floats, i.e. whether it sticks to
 //     the top of the viewport when the editor is partially scrolled
 //     out of view.
-function menuBar(options) {
+export function menuBar(options) {
   return new Plugin({
     view(editorView) { return new MenuBarView(editorView, options) }
   })
 }
-exports.menuBar = menuBar
 
 class MenuBarView {
   constructor(editorView, options) {
@@ -50,24 +49,28 @@ class MenuBarView {
     this.widthForMaxHeight = 0
     this.floating = false
 
+    let {dom, update} = renderGrouped(this.editorView, this.options.content)
+    this.contentUpdate = update
+    this.menu.appendChild(dom)
     this.update()
 
     if (options.floating && !isIOS()) {
       this.updateFloat()
-      this.scrollFunc = () => {
+      let potentialScrollers = getAllWrapping(this.wrapper)
+      this.scrollFunc = (e) => {
         let root = this.editorView.root
-        if (!(root.body || root).contains(this.wrapper))
-          window.removeEventListener("scroll", this.scrollFunc)
-        else
-          this.updateFloat()
+        if (!(root.body || root).contains(this.wrapper)) {
+            potentialScrollers.forEach(el => el.removeEventListener("scroll", this.scrollFunc))
+        } else {
+            this.updateFloat(e.target.getBoundingClientRect && e.target)
+        }
       }
-      window.addEventListener("scroll", this.scrollFunc)
+      potentialScrollers.forEach(el => el.addEventListener('scroll', this.scrollFunc))
     }
   }
 
   update() {
-    this.menu.textContent = ""
-    this.menu.appendChild(renderGrouped(this.editorView, this.options.content))
+    this.contentUpdate(this.editorView.state)
 
     if (this.floating) {
       this.updateScrollCursor()
@@ -96,12 +99,14 @@ class MenuBarView {
     }
   }
 
-  updateFloat() {
-    let parent = this.wrapper, editorRect = parent.getBoundingClientRect()
+  updateFloat(scrollAncestor) {
+    let parent = this.wrapper, editorRect = parent.getBoundingClientRect(),
+        top = scrollAncestor ? Math.max(0, scrollAncestor.getBoundingClientRect().top) : 0
+
     if (this.floating) {
-      if (editorRect.top >= 0 || editorRect.bottom < this.menu.offsetHeight + 10) {
+      if (editorRect.top >= top || editorRect.bottom < this.menu.offsetHeight + 10) {
         this.floating = false
-        this.menu.style.position = this.menu.style.left = this.menu.style.width = ""
+        this.menu.style.position = this.menu.style.left = this.menu.style.top = this.menu.style.width = ""
         this.menu.style.display = ""
         this.spacer.parentNode.removeChild(this.spacer)
         this.spacer = null
@@ -109,13 +114,15 @@ class MenuBarView {
         let border = (parent.offsetWidth - parent.clientWidth) / 2
         this.menu.style.left = (editorRect.left + border) + "px"
         this.menu.style.display = (editorRect.top > window.innerHeight ? "none" : "")
+        if (scrollAncestor) this.menu.style.top = top + "px"
       }
     } else {
-      if (editorRect.top < 0 && editorRect.bottom >= this.menu.offsetHeight + 10) {
+      if (editorRect.top < top && editorRect.bottom >= this.menu.offsetHeight + 10) {
         this.floating = true
         let menuRect = this.menu.getBoundingClientRect()
         this.menu.style.left = menuRect.left + "px"
         this.menu.style.width = menuRect.width + "px"
+        if (scrollAncestor) this.menu.style.top = top + "px"
         this.menu.style.position = "fixed"
         this.spacer = crel("div", {class: prefix + "-spacer", style: `height: ${menuRect.height}px`})
         parent.insertBefore(this.spacer, this.menu)
@@ -138,4 +145,11 @@ function selectionIsInverted(selection) {
 function findWrappingScrollable(node) {
   for (let cur = node.parentNode; cur; cur = cur.parentNode)
     if (cur.scrollHeight > cur.clientHeight) return cur
+}
+
+function getAllWrapping(node) {
+    let res = [window]
+    for (let cur = node.parentNode; cur; cur = cur.parentNode)
+        res.push(cur)
+    return res
 }

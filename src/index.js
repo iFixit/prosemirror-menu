@@ -1,9 +1,6 @@
-;({MenuItem: exports.MenuItem, Dropdown: exports.Dropdown, DropdownSubmenu: exports.DropdownSubmenu,
-   renderGrouped: exports.renderGrouped, icons: exports.icons, joinUpItem: exports.joinUpItem,
-   liftItem: exports.liftItem, selectParentNodeItem: exports.selectParentNodeItem,
-   undoItem: exports.undoItem, redoItem: exports.redoItem, wrapItem: exports.wrapItem,
-   blockTypeItem: exports.blockTypeItem} = require("./menu"))
-exports.menuBar = require("./menubar").menuBar
+export {MenuItem, Dropdown, DropdownSubmenu, renderGrouped, icons, joinUpItem, liftItem, selectParentNodeItem,
+        undoItem, redoItem, wrapItem, blockTypeItem} from "./menu"
+export {menuBar} from "./menubar"
 
 // !! This module defines a number of building blocks for ProseMirror
 // menus, along with a [menu bar](#menu.menuBar) implementation.
@@ -13,7 +10,8 @@ exports.menuBar = require("./menubar").menuBar
 // display in your menu. Anything that conforms to this interface can
 // be put into a menu structure.
 //
-//   render:: (pm: ProseMirror) → ?dom.Node
-//   Render the element for display in the menu. Returning `null` can be
-//   used to signal that this element shouldn't be displayed for the
-//   given editor state.
+//   render:: (pm: EditorView) → {dom: dom.Node, update: (EditorState) → bool}
+//   Render the element for display in the menu. Must return a DOM
+//   element and a function that can be used to update the element to
+//   a new state. The `update` function will return false if the
+//   update hid the entire element.

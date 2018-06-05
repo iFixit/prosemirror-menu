@@ -1,13 +1,13 @@
-const crel = require("crel")
-const {lift, joinUp, selectParentNode, wrapIn, setBlockType} = require("prosemirror-commands")
-const {undo, redo} = require("prosemirror-history")
+import crel from "crel"
+import {lift, joinUp, selectParentNode, wrapIn, setBlockType} from "prosemirror-commands"
+import {undo, redo} from "prosemirror-history"
 
-const {getIcon} = require("./icons")
+import {getIcon} from "./icons"
 
 const prefix = "ProseMirror-menu"
 
 // ::- An icon or label that, when clicked, executes a command.
-class MenuItem {
+export class MenuItem {
   // :: (MenuItemSpec)
   constructor(spec) {
     // :: MenuItemSpec
@@ -15,45 +15,50 @@ class MenuItem {
     this.spec = spec
   }
 
-  // :: (EditorView) → dom.Node
+  // :: (EditorView) → {dom: dom.Node, update: (EditorState) → bool}
   // Renders the icon according to its [display
   // spec](#menu.MenuItemSpec.display), and adds an event handler which
   // executes the command when the representation is clicked.
   render(view) {
-    let disabled = false, spec = this.spec
-    if (spec.select && !spec.select(view.state)) {
-      if (spec.onDeselected == "disable") disabled = true
-      else return null
-    }
-    let active = spec.active && !disabled && spec.active(view.state)
-
-    let dom
-    if (spec.render) {
-      dom = spec.render(view)
-    } else if (spec.icon) {
-      dom = getIcon(spec.icon)
-      if (active) dom.classList.add(prefix + "-active")
-    } else if (spec.label) {
-      dom = crel("div", null, translate(view, spec.label))
-    } else {
-      throw new RangeError("MenuItem without render, icon, or label property")
-    }
-
+    let spec = this.spec
+    let dom = spec.render ? spec.render(view)
+        : spec.icon ? getIcon(spec.icon)
+        : spec.label ? crel("div", null, translate(view, spec.label))
+        : null
+    if (!dom) throw new RangeError("MenuItem without icon or label property")
     if (spec.title) {
       const title = (typeof spec.title === "function" ? spec.title(view.state) : spec.title)
       dom.setAttribute("title", translate(view, title))
     }
     if (spec.class) dom.classList.add(spec.class)
-    if (disabled) dom.classList.add(prefix + "-disabled")
     if (spec.css) dom.style.cssText += spec.css
-    if (!disabled) dom.addEventListener(spec.execEvent || "mousedown", e => {
+
+    dom.addEventListener("mousedown", e => {
       e.preventDefault()
       spec.run(view.state, view.dispatch, view, e)
     })
-    return dom
+
+    function update(state) {
+      if (spec.select) {
+        let selected = spec.select(state)
+        dom.style.display = selected ? "" : "none"
+        if (!selected) return false
+      }
+      let enabled = true
+      if (spec.enable) {
+        enabled = spec.enable(state) || false
+        setClass(dom, prefix + "-disabled", !enabled)
+      }
+      if (spec.active) {
+        let active = enabled && spec.active(state) || false
+        setClass(dom, prefix + "-active", active)
+      }
+      return true
+    }
+
+    return {dom, update}
   }
 }
-exports.MenuItem = MenuItem
 
 function translate(view, text) {
   return view._props.translate ? view._props.translate(text) : text
@@ -67,12 +72,12 @@ function translate(view, text) {
 //
 //   select:: ?(EditorState) → bool
 //   Optional function that is used to determine whether the item is
-//   appropriate at the moment.
+//   appropriate at the moment. Deselected items will be hidden.
 //
-//   onDeselected:: ?string
-//   Determines what happens when [`select`](#menu.MenuItemSpec.select)
-//   returns false. The default is to hide the item, you can set this to
-//   `"disable"` to instead render the item with a disabled style.
+//   enable:: ?(EditorState) → bool
+//   Function that is used to determine if the item is enabled. If
+//   given and returning false, the item will be given a disabled
+//   styling.
 //
 //   active:: ?(EditorState) → bool
 //   A predicate function to determine whether the item is 'active' (for
@@ -102,14 +107,14 @@ function translate(view, text) {
 //   title:: ?union<string, (EditorState) → string>
 //   Defines DOM title (mouseover) text for the item.
 //
-//   class:: string
+//   class:: ?string
 //   Optionally adds a CSS class to the item's DOM representation.
 //
-//   css:: string
+//   css:: ?string
 //   Optionally adds a string of inline CSS to the item's DOM
 //   representation.
 //
-//   execEvent:: string
+//   execEvent:: ?string
 //   Defines which event on the command's DOM representation should
 //   trigger the execution of the command. Defaults to mousedown.
 
@@ -125,7 +130,7 @@ function isMenuEvent(wrapper) {
 
 // ::- A drop-down menu, displayed as a label with a downwards-pointing
 // triangle to the right of it.
-class Dropdown {
+export class Dropdown {
   // :: ([MenuElement], ?Object)
   // Create a dropdown wrapping the elements. Options may include
   // the following properties:
@@ -148,16 +153,15 @@ class Dropdown {
     this.content = Array.isArray(content) ? content : [content]
   }
 
-  // :: (EditorView) → dom.Node
-  // Returns a node showing the collapsed menu, which expands when clicked.
+  // :: (EditorView) → {dom: dom.Node, update: (EditorState)}
+  // Render the dropdown menu and sub-items.
   render(view) {
-    let items = renderDropdownItems(this.content, view)
-    if (!items.length) return null
+    let content = renderDropdownItems(this.content, view)
 
     let label = crel("div", {class: prefix + "-dropdown " + (this.options.class || ""),
-                             style: this.options.css,
-                             title: this.options.title && translate(view, this.options.title)},
-                    translate(view, this.options.label))
+                             style: this.options.css},
+                     translate(view, this.options.label))
+    if (this.options.title) label.setAttribute("title", translate(view, this.options.title))
     let wrap = crel("div", {class: prefix + "-dropdown-wrap"}, label)
     let open = null, listeningOnClose = null
     let close = () => {
@@ -172,13 +176,20 @@ class Dropdown {
       if (open) {
         close()
       } else {
-        open = this.expand(wrap, items)
+        open = this.expand(wrap, content.dom)
         window.addEventListener("mousedown", listeningOnClose = () => {
           if (!isMenuEvent(wrap)) close()
         })
       }
     })
-    return wrap
+
+    function update(state) {
+      let inner = content.update(state)
+      wrap.style.display = inner ? "" : "none"
+      return inner
+    }
+
+    return {dom: wrap, update}
   }
 
   expand(dom, items) {
@@ -195,20 +206,32 @@ class Dropdown {
     return {close, node: menuDOM}
   }
 }
-exports.Dropdown = Dropdown
 
 function renderDropdownItems(items, view) {
-  let rendered = []
+  let rendered = [], updates = []
   for (let i = 0; i < items.length; i++) {
-    let inner = items[i].render(view)
-    if (inner) rendered.push(crel("div", {class: prefix + "-dropdown-item"}, inner))
+    let {dom, update} = items[i].render(view)
+    rendered.push(crel("div", {class: prefix + "-dropdown-item"}, dom))
+    updates.push(update)
   }
-  return rendered
+  return {dom: rendered, update: combineUpdates(updates, rendered)}
+}
+
+function combineUpdates(updates, nodes) {
+  return state => {
+    let something = false
+    for (let i = 0; i < updates.length; i++) {
+      let up = updates[i](state)
+      nodes[i].style.display = up ? "" : "none"
+      if (up) something = true
+    }
+    return something
+  }
 }
 
 // ::- Represents a submenu wrapping a group of elements that start
 // hidden and expand to the right when hovered over or tapped.
-class DropdownSubmenu {
+export class DropdownSubmenu {
   // :: ([MenuElement], ?Object)
   // Creates a submenu for the given group of menu elements. The
   // following options are recognized:
@@ -220,20 +243,19 @@ class DropdownSubmenu {
     this.content = Array.isArray(content) ? content : [content]
   }
 
-  // :: (EditorView) → dom.Node
+  // :: (EditorView) → {dom: dom.Node, update: (EditorState) → bool}
   // Renders the submenu.
   render(view) {
     let items = renderDropdownItems(this.content, view)
-    if (!items.length) return null
 
     let label = crel("div", {class: prefix + "-submenu-label"}, translate(view, this.options.label))
     let wrap = crel("div", {class: prefix + "-submenu-wrap"}, label,
-                   crel("div", {class: prefix + "-submenu"}, items))
+                   crel("div", {class: prefix + "-submenu"}, items.dom))
     let listeningOnClose = null
     label.addEventListener("mousedown", e => {
       e.preventDefault()
       markMenuEvent(e)
-      wrap.classList.toggle(prefix + "-submenu-wrap-active")
+      setClass(wrap, prefix + "-submenu-wrap-active")
       if (!listeningOnClose)
         window.addEventListener("mousedown", listeningOnClose = () => {
           if (!isMenuEvent(wrap)) {
@@ -243,33 +265,52 @@ class DropdownSubmenu {
           }
         })
     })
-    return wrap
+
+    function update(state) {
+      let inner = items.update(state)
+      wrap.style.display = inner ? "" : "none"
+      return inner
+    }
+    return {dom: wrap, update}
   }
 }
-exports.DropdownSubmenu = DropdownSubmenu
 
-// :: (EditorView, [union<MenuElement, [MenuElement]>]) → ?dom.DocumentFragment
+// :: (EditorView, [union<MenuElement, [MenuElement]>]) → {dom: ?dom.DocumentFragment, update: (EditorState) → bool}
 // Render the given, possibly nested, array of menu elements into a
 // document fragment, placing separators between them (and ensuring no
 // superfluous separators appear when some of the groups turn out to
 // be empty).
-function renderGrouped(view, content) {
-  let result = document.createDocumentFragment(), needSep = false
+export function renderGrouped(view, content) {
+  let result = document.createDocumentFragment()
+  let updates = [], separators = []
   for (let i = 0; i < content.length; i++) {
-    let items = content[i], added = false
+    let items = content[i], localUpdates = [], localNodes = []
     for (let j = 0; j < items.length; j++) {
-      let rendered = items[j].render(view)
-      if (rendered) {
-        if (!added && needSep) result.appendChild(separator())
-        result.appendChild(crel("span", {class: prefix + "item"}, rendered))
-        added = true
-      }
+      let {dom, update} = items[j].render(view)
+      let span = crel("span", {class: prefix + "item"}, dom)
+      result.appendChild(span)
+      localNodes.push(span)
+      localUpdates.push(update)
     }
-    if (added) needSep = true
+    if (localUpdates.length) {
+      updates.push(combineUpdates(localUpdates, localNodes))
+      if (i < content.length - 1)
+        separators.push(result.appendChild(separator()))
+    }
   }
-  return result
+
+  function update(state) {
+    let something = false, needSep = false
+    for (let i = 0; i < updates.length; i++) {
+      let hasContent = updates[i](state)
+      if (i) separators[i - 1].style.display = needSep && hasContent ? "" : "none"
+      needSep = hasContent
+      if (hasContent) something = true
+    }
+    return something
+  }
+  return {dom: result, update}
 }
-exports.renderGrouped = renderGrouped
 
 function separator() {
   return crel("span", {class: prefix + "separator"})
@@ -281,7 +322,7 @@ function separator() {
 // `code`, `link`, `bulletList`, `orderedList`, and `blockquote`, each
 // holding an object that can be used as the `icon` option to
 // `MenuItem`.
-const icons = {
+export const icons = {
   join: {
     width: 800, height: 900,
     path: "M0 75h800v125h-800z M0 825h800v-125h-800z M250 400h100v-100h100v100h100v100h-100v100h-100v-100h-100z"
@@ -328,64 +369,57 @@ const icons = {
     path: "M0 448v256h256v-256h-128c0 0 0-128 128-128v-128c0 0-256 0-256 256zM640 320v-128c0 0-256 0-256 256v256h256v-256h-128c0 0 0-128 128-128z"
   }
 }
-exports.icons = icons
 
 // :: MenuItem
 // Menu item for the `joinUp` command.
-const joinUpItem = new MenuItem({
+export const joinUpItem = new MenuItem({
   title: "Join with above block",
   run: joinUp,
   select: state => joinUp(state),
   icon: icons.join
 })
-exports.joinUpItem = joinUpItem
 
 // :: MenuItem
 // Menu item for the `lift` command.
-const liftItem = new MenuItem({
+export const liftItem = new MenuItem({
   title: "Lift out of enclosing block",
   run: lift,
   select: state => lift(state),
   icon: icons.lift
 })
-exports.liftItem = liftItem
 
 // :: MenuItem
 // Menu item for the `selectParentNode` command.
-const selectParentNodeItem = new MenuItem({
+export const selectParentNodeItem = new MenuItem({
   title: "Select parent node",
   run: selectParentNode,
   select: state => selectParentNode(state),
   icon: icons.selectParentNode
 })
-exports.selectParentNodeItem = selectParentNodeItem
 
-// :: (Object) → MenuItem
+// :: MenuItem
 // Menu item for the `undo` command.
-let undoItem = new MenuItem({
+export let undoItem = new MenuItem({
   title: "Undo last change",
   run: undo,
-  select: state => undo(state),
+  enable: state => undo(state),
   icon: icons.undo
 })
-exports.undoItem = undoItem
 
-// :: (Object) → MenuItem
+// :: MenuItem
 // Menu item for the `redo` command.
-let redoItem = new MenuItem({
+export let redoItem = new MenuItem({
   title: "Redo last undone change",
   run: redo,
-  select: state => redo(state),
+  enable: state => redo(state),
   icon: icons.redo
 })
-exports.redoItem = redoItem
 
 // :: (NodeType, Object) → MenuItem
 // Build a menu item for wrapping the selection in a given node type.
 // Adds `run` and `select` properties to the ones present in
-// `options`. `options.attrs` may be an object or a function, as in
-// `toggleMarkItem`.
-function wrapItem(nodeType, options) {
+// `options`. `options.attrs` may be an object or a function.
+export function wrapItem(nodeType, options) {
   let passedOptions = {
     run(state, dispatch) {
       // FIXME if (options.attrs instanceof Function) options.attrs(state, attrs => wrapIn(nodeType, attrs)(state))
@@ -398,18 +432,17 @@ function wrapItem(nodeType, options) {
   for (let prop in options) passedOptions[prop] = options[prop]
   return new MenuItem(passedOptions)
 }
-exports.wrapItem = wrapItem
 
 // :: (NodeType, Object) → MenuItem
 // Build a menu item for changing the type of the textblock around the
 // selection to the given type. Provides `run`, `active`, and `select`
 // properties. Others must be given in `options`. `options.attrs` may
 // be an object to provide the attributes for the textblock node.
-function blockTypeItem(nodeType, options) {
+export function blockTypeItem(nodeType, options) {
   let command = setBlockType(nodeType, options.attrs)
   let passedOptions = {
     run: command,
-    select(state) { return command(state) },
+    enable(state) { return command(state) },
     active(state) {
       let {$from, to, node} = state.selection
       if (node) return node.hasMarkup(nodeType, options.attrs)
@@ -419,4 +452,9 @@ function blockTypeItem(nodeType, options) {
   for (let prop in options) passedOptions[prop] = options[prop]
   return new MenuItem(passedOptions)
 }
-exports.blockTypeItem = blockTypeItem
+
+// Work around classList.toggle being broken in IE11
+function setClass(dom, cls, on) {
+  if (on) dom.classList.add(cls)
+  else dom.classList.remove(cls)
+}
