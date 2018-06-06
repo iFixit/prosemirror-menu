@@ -1,3 +1,7 @@
+.prosemirror {
+   outline-style: none;
+}
+
 .ProseMirror-textblock-dropdown {
   min-width: 3em;
 }
@@ -46,7 +50,7 @@
   border-left: 4px solid transparent;
   border-right: 4px solid transparent;
   border-top: 4px solid currentColor;
-  opacity: .6;
+  color: rgba(0,0,0,.6);
   position: absolute;
   right: 4px;
   top: calc(50% - 2px);
@@ -84,7 +88,7 @@
   border-top: 4px solid transparent;
   border-bottom: 4px solid transparent;
   border-left: 4px solid currentColor;
-  opacity: .6;
+  color: rgba(0,0,0,.6);
   position: absolute;
   right: 4px;
   top: calc(50% - 4px);
@@ -108,7 +112,7 @@
 }
 
 .ProseMirror-menu-disabled {
-  opacity: .3;
+  color: rgba(0,0,0,.2);
 }
 
 .ProseMirror-menu-submenu-wrap:hover .ProseMirror-menu-submenu, .ProseMirror-menu-submenu-wrap-active .ProseMirror-menu-submenu {
@@ -129,6 +133,7 @@
   -moz-box-sizing: border-box;
   box-sizing: border-box;
   overflow: visible;
+  outline-style: none;
 }
 
 .ProseMirror-icon {
