@@ -1,3 +1,7 @@
+.prosemirror {
+   outline-style: none;
+}
+
 .ProseMirror-textblock-dropdown {
   min-width: 3em;
 }
@@ -46,7 +50,7 @@
   border-left: 4px solid transparent;
   border-right: 4px solid transparent;
   border-top: 4px solid currentColor;
-  opacity: .6;
+  color: rgba(0,0,0,.6);
   position: absolute;
   right: 4px;
   top: calc(50% - 2px);
@@ -84,7 +88,7 @@
   border-top: 4px solid transparent;
   border-bottom: 4px solid transparent;
   border-left: 4px solid currentColor;
-  opacity: .6;
+  color: rgba(0,0,0,.6);
   position: absolute;
   right: 4px;
   top: calc(50% - 4px);
@@ -108,7 +112,7 @@
 }
 
 .ProseMirror-menu-disabled {
-  opacity: .3;
+  color: rgba(0,0,0,.2);
 }
 
 .ProseMirror-menu-submenu-wrap:hover .ProseMirror-menu-submenu, .ProseMirror-menu-submenu-wrap-active .ProseMirror-menu-submenu {
@@ -129,6 +133,7 @@
   -moz-box-sizing: border-box;
   box-sizing: border-box;
   overflow: visible;
+  outline-style: none;
 }
 
 .ProseMirror-icon {
@@ -137,6 +142,45 @@
   vertical-align: -2px; /* Compensate for padding */
   padding: 2px 8px;
   cursor: pointer;
+  position: relative;
+}
+
+/* Tooltip text */
+.ProseMirror-icon .tooltiptext {
+    /* don't show the icon before hover */
+    opacity: 0;
+
+    /* stying etc */
+    background-color: black;
+    color: #fff;
+    text-align: center;
+    padding: 5px 0;
+    border-radius: 4px;
+    width: 180px;
+    font-size: 16px;
+    font-family: sans-serif;
+
+    /* Position the tooltip text */
+    position: absolute;
+    bottom: 120%;
+    left: 50%;
+    margin-left: -90px;
+}
+
+.ProseMirror-icon:hover .tooltiptext {
+    opacity: 1;
+    transition: opacity 0.2s .2s ease;
+}
+
+.ProseMirror-icon .tooltiptext::after { /* https://www.w3schools.com/css/css_tooltip.asp */
+    content: " ";
+    position: absolute;
+    top: 100%; /* At the bottom of the tooltip */
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: black transparent transparent transparent;
 }
 
 .ProseMirror-menu-disabled.ProseMirror-icon {
