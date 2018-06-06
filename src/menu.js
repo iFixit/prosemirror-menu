@@ -27,8 +27,19 @@ export class MenuItem {
         : null
     if (!dom) throw new RangeError("MenuItem without icon or label property")
     if (spec.title) {
-      const title = (typeof spec.title === "function" ? spec.title(view.state) : spec.title)
-      dom.setAttribute("title", translate(view, title))
+       let title = (typeof spec.title === "function" ? spec.title(view.state) : spec.title)
+
+       if (spec.shortcut) {
+          const modKey = navigator.userAgent.indexOf('Mac') > 0 ? '⌘' : 'ctrl';
+          const shortcut = spec.shortcut;
+          title = `${title} (${modKey}+${shortcut})`;
+       }
+
+       const tooltip = crel('div', {
+          'class': 'tooltiptext'
+       }, title);
+
+       dom.appendChild(tooltip);
     }
     if (spec.class) dom.classList.add(spec.class)
     if (spec.css) dom.style.cssText += spec.css
