@@ -32,7 +32,7 @@ export class MenuItem {
        if (spec.shortcut) {
           const modKey = navigator.userAgent.indexOf('Mac') > 0 ? '⌘' : 'ctrl+';
           const shortcut = spec.shortcut;
-          title = `${title} <${modKey}${shortcut}>`;
+          title = `${title} (${modKey}${shortcut})`;
        }
 
        const tooltip = crel('div', {
