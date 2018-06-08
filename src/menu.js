@@ -30,9 +30,9 @@ export class MenuItem {
        let title = (typeof spec.title === "function" ? spec.title(view.state) : spec.title)
 
        if (spec.shortcut) {
-          const modKey = navigator.userAgent.indexOf('Mac') > 0 ? '⌘' : 'ctrl';
+          const modKey = navigator.userAgent.indexOf('Mac') > 0 ? '⌘' : 'ctrl+';
           const shortcut = spec.shortcut;
-          title = `${title} (${modKey}+${shortcut})`;
+          title = `${title} <${modKey}${shortcut}>`;
        }
 
        const tooltip = crel('div', {
