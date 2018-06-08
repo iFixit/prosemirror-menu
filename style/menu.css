@@ -154,17 +154,16 @@
     background-color: black;
     color: #fff;
     text-align: center;
-    padding: 5px 0;
+    padding: 5px 10px;
+    width: max-content;
     border-radius: 4px;
-    width: 180px;
     font-size: 16px;
     font-family: sans-serif;
 
     /* Position the tooltip text */
     position: absolute;
     bottom: 120%;
-    left: 50%;
-    margin-left: -90px;
+    left: -7px;
 }
 
 .ProseMirror-icon:hover .tooltiptext {
@@ -176,9 +175,9 @@
     content: " ";
     position: absolute;
     top: 100%; /* At the bottom of the tooltip */
-    left: 50%;
-    margin-left: -5px;
-    border-width: 5px;
+    left: 15px;
+    margin-left: -6px;
+    border-width: 6px;
     border-style: solid;
     border-color: black transparent transparent transparent;
 }
