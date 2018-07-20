@@ -53,6 +53,7 @@ class MenuBarView {
     this.contentUpdate = update
     this.menu.appendChild(dom)
     this.update()
+    window.addEventListener('resize', this.update);
 
     if (options.floating && !isIOS()) {
       this.updateFloat()
