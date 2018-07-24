@@ -44,7 +44,7 @@ export class MenuItem {
     if (spec.class) dom.classList.add(spec.class)
     if (spec.css) dom.style.cssText += spec.css
 
-    dom.addEventListener("mousedown", e => {
+    dom.addEventListener(spec.execEvent || "mousedown", e => {
       e.preventDefault()
       spec.run(view.state, view.dispatch, view, e)
     })
